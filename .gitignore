@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pkl
+*.db
+*.sqlite3
+
+# Virtual Environments
+.venv/
+.venv311/
+venv/
+venv311/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# PyCharm / VSCode
+.idea/
+.vscode/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Data files (optional: if you want to ignore large datasets)
+
+
+# Streamlit config/cache
+.streamlit/
+
+# Pytest cache
+.pytest_cache/
+
+# Python embeddings and models
+*.pt
+*.bin
+*.model
+
+# dotenv environment file
+.env

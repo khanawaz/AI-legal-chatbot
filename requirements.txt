@@ -1,0 +1,17 @@
+python-dotenv==1.0.1
+numpy==1.26.4
+pandas==2.2.2
+sentence-transformers==2.7.0
+faiss-cpu==1.8.0.post1
+pymupdf==1.24.10
+pinecone-client==5.0.1
+langchain-openai==0.2.6
+langchain-core==0.3.11
+langchain-community==0.3.2
+langchain-text-splitters==0.3.0
+chainlit==1.2.0
+tqdm==4.66.5
+streamlit==1.40.2
+streamlit-lottie==0.0.5
+
+supabase==2.6.0
