@@ -1,18 +1,18 @@
+# src/ui/streamlit_app.py
 import os
 import sys
 from pathlib import Path
 from dotenv import load_dotenv
 import streamlit as st
-# Optional lottie support: prefer streamlit_lottie if installed, otherwise provide a minimal fallback.
+
+# Optional lottie (with graceful fallback)
 try:
     from streamlit_lottie import st_lottie
 except Exception:
     import json as _json
     import base64 as _base64
     import streamlit.components.v1 as _components
-
     def st_lottie(lottie_data, height=240, key=None, loop=True):
-        """Fallback renderer for Lottie animations using the lottie-player web component."""
         if not lottie_data:
             return None
         try:
@@ -23,7 +23,6 @@ except Exception:
                 b64 = _base64.b64encode(lottie_data.encode()).decode()
                 src = f"data:application/json;base64,{b64}"
             else:
-                # assume it's a URL
                 src = lottie_data
             html = f'''
             <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
@@ -36,12 +35,42 @@ except Exception:
 import json
 import requests
 
-# Ensure project root is on sys.path and env loaded
+# ----- Project setup & env -----
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.append(str(PROJECT_ROOT))
-load_dotenv(dotenv_path=PROJECT_ROOT / ".env")
+load_dotenv(PROJECT_ROOT / ".env")
 
 from src.llm.rag_pipeline import get_legal_answer  # noqa: E402
+from src.auth.auth_service import (
+    signup_email_password,
+    login_email_password,
+    current_user,
+    logout,
+)
+def st_current_user():
+    user = current_user()
+    if user:
+        st.session_state["user"] = user
+        return user
+    return st.session_state.get("user")
+
+def st_login(email: str, password: str):
+    try:
+        resp = login_email_password(email, password)
+        user = current_user()
+        if user:
+            st.session_state["user"] = user
+            return True, "Login successful"
+        return False, "Login succeeded but no session found"
+    except Exception as e:
+        return False, f"Login failed: {e}"
+
+def st_logout():
+    try:
+        logout()
+    except Exception:
+        pass
+    st.session_state.pop("user", None)
 
 
 def load_lottie(url: str):
@@ -52,91 +81,64 @@ def load_lottie(url: str):
     except Exception:
         return None
 
+def auth_sidebar():
+    user = st_current_user()
+    if user:
+        st.success(f"Signed in as **{user.get('email','')}**")
+        if st.button("Logout", use_container_width=True):
+            st_logout()
+            st.rerun()
+        st.markdown("---")
+        return True
+
+    tabs = st.tabs(["Login", "Sign up"])
+    with tabs[0]:
+        with st.form("login_form", clear_on_submit=False):
+            email = st.text_input("Email", key="login_email")
+            pwd = st.text_input("Password", type="password", key="login_pwd")
+            submitted = st.form_submit_button("Login")
+        if submitted:
+            ok, msg = st_login(email, pwd)
+            if ok:
+                st.success("Login successful!")
+                st.rerun()
+            else:
+                st.error(msg)
+
+    with tabs[1]:
+        with st.form("signup_form", clear_on_submit=False):
+            name = st.text_input("Full name", key="signup_name")
+            email = st.text_input("Email", key="signup_email")
+            pwd = st.text_input("Password (min 6 chars)", type="password", key="signup_pwd")
+            submitted = st.form_submit_button("Create account")
+        if submitted:
+            ok, msg = signup_email_password(email, pwd, name)
+            if ok:
+                st.success(msg)
+                st.rerun()
+            else:
+                st.error(msg)
+
+    st.markdown("---")
+    return False
 
 def main() -> None:
+    """Main entry point for the Streamlit app (legacy - use streamlit_app/main.py instead)"""
+    # Redirect to the new main.py structure
     st.set_page_config(page_title="LegaBot - Indian Legal Assistant", page_icon="⚖️", layout="wide")
-
-    # Theme auto-follow via CSS respects user system preference
-    st.markdown(
-        """
-        <style>
-          @media (prefers-color-scheme: dark) {
-            :root { color-scheme: dark; }
-          }
-          .stButton>button[kind="primary"] { transition: transform .08s ease; }
-          .stButton>button[kind="primary"]:active { transform: scale(0.98); }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    st.title("⚖️ LegaBot – Indian Legal Research Assistant")
-    st.markdown(
-        """
-        Ask questions about IPC/CrPC and landmark judgments. Answers are generated via RAG over your indexed documents.
-        """
-    )
-
-    with st.sidebar:
-        st.header("Configuration")
-        pinecone_idx = os.getenv("PINECONE_INDEX_NAME", "")
-        st.markdown(f"**Pinecone Index:** `{pinecone_idx or 'not set'}`")
-        st.markdown("---")
-        st.subheader("Examples")
-        examples = [
-            "What is theft under IPC?",
-            "Punishment for murder?",
-            "What section deals with bail?",
-        ]
-        for ex in examples:
-            if st.button(ex, use_container_width=True):
-                st.session_state["query"] = ex
-
-    lottie = load_lottie("https://assets4.lottiefiles.com/packages/lf20_qp1q7mct.json")
-
-    left, right = st.columns([6, 5])
-    with left:
-        query = st.text_area("Enter your question", value=st.session_state.get("query", ""), height=100)
-        col1, col2, col3 = st.columns([1.2, 1, 6])
-        with col1:
-            run = st.button("Ask", type="primary", use_container_width=True)
-        with col2:
-            clear = st.button("Clear", use_container_width=True)
-        with col3:
-            system_theme = st.toggle("Follow system theme", value=True)
-    with right:
-        if lottie:
-            st_lottie(lottie, height=240, key="header_anim", loop=True)
-        else:
-            st.empty()
-
-    if clear:
-        st.session_state.pop("query", None)
-        st.rerun()
-
-    if run:
-        if not query.strip():
-            st.warning("Please enter a valid question.")
-            return
-        with st.spinner("Searching legal documents and generating answer..."):
-            answer = get_legal_answer(query.strip())
-
-        # Answer card
-        st.subheader("Answer")
-        st.markdown(
-            f"""
-            <div style="padding:16px;border-radius:12px;background:var(--secondary-background-color,#f6f7fb);">
-                {answer}
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        # Copy to clipboard (simple approach)
-        st.code(answer if isinstance(answer, str) else str(answer))
-
+    st.info("ℹ️ This is the legacy entry point. Please use `streamlit run src/ui/streamlit_app/main.py` instead.")
+    st.markdown("""
+        <div style="text-align: center; padding: 2rem;">
+            <h2>Redirecting to new interface...</h2>
+            <p>Please run: <code>streamlit run src/ui/streamlit_app/main.py</code></p>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    # Try to redirect if possible
+    try:
+        st.switch_page("streamlit_app/main.py")
+    except:
+        pass
 
 if __name__ == "__main__":
     main()
-
-
