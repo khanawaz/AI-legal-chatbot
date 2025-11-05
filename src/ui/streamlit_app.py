@@ -60,7 +60,7 @@ def st_login(email: str, password: str):
         user = current_user()
         if user:
             st.session_state["user"] = user
-            return True, "Login successful"
+            return True, "Login successfull"
         return False, "Login succeeded but no session found"
     except Exception as e:
         return False, f"Login failed: {e}"
